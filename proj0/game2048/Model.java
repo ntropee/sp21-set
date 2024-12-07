@@ -101,7 +101,7 @@ public class Model extends Observable {
      *    value and that new value is added to the score instance variable
      * 2. A tile that is the result of a merge will not merge again on that
      *    tilt. So each move, every tile will only ever be part of at most one
-     *    merge (perhaps zero).
+     *    merge (perhaps zero). Create a boolean for merged
      * 3. When three adjacent tiles in the direction of motion have the same
      *    value, then the leading two tiles in the direction of motion merge,
      *    and the trailing tile does not.
@@ -109,6 +109,44 @@ public class Model extends Observable {
     public boolean tilt(Side side) {
         boolean changed;
         changed = false;
+
+        this.board.setViewingPerspective(side);
+        for (int c = 0; c <= 3; c += 1) {
+            boolean[] hasMerged = new boolean[]{false, false, false, false};
+            for (int r = 3; r >= 0; r -= 1) {
+                if (r == 3) {
+                    int first = handleFirst(c);
+                    if (first == 0){
+                        continue;
+                    } else if (first == 1) {
+                        changed = true;
+                        continue;
+                    } else if (first == -2) {
+                        continue;
+                    }
+                }
+                if (board.tile(c, r) != null) {
+                    Tile t = board.tile(c, r);
+                    int currentRowVal = board.tile(c, r).value();
+                    int storedNextRow = getNextRow(c, r + 1);
+                    if (storedNextRow != -2) {
+                        int storedNextVal = getNextVal(c, storedNextRow);
+                        boolean movePossible = getMovePossible(r, storedNextRow);
+                        boolean needMerge = getNeedMerge(currentRowVal, storedNextVal, storedNextRow, hasMerged);
+                        if (needMerge == true) {
+                            board.move(c, storedNextRow, t);
+                            hasMerged[storedNextRow] = true;
+                            changed = true;
+                            score += (2 * storedNextVal);
+                        } else if (movePossible == true) {
+                                board.move(c, storedNextRow - 1, t);
+                                changed = true;
+                            }
+                    }
+                }
+            }
+        }
+        board.setViewingPerspective(Side.NORTH);
 
         // TODO: Modify this.board (and perhaps this.score) to account
         // for the tilt to the Side SIDE. If the board changed, set the
@@ -119,7 +157,53 @@ public class Model extends Observable {
             setChanged();
         }
         return changed;
+
     }
+
+    public int handleFirst(int c) {
+        if (board.tile(c, 3) != null) {
+            return 0;
+        } else {
+            for (int nextRow = 2; nextRow >= 0; nextRow -= 1) {
+                if (board.tile(c, nextRow) != null) {
+                    Tile t = board.tile(c, nextRow);
+                    board.move(c, 3, t);
+                    return 1;
+                }
+            }
+            return -2;
+        }
+    }
+
+
+    public int getNextRow(int c, int r) {
+        for (int nextRow = r; nextRow <= 3; nextRow += 1) {
+            if (board.tile(c, nextRow) != null) {
+                return (nextRow);
+            }
+        } return -2;
+    }
+
+    public int getNextVal(int c, int nextRow) {
+        return board.tile(c, nextRow).value();
+    }
+
+    public boolean getMovePossible(int currentRow, int nextRow){
+        if (nextRow - currentRow == 1) {
+            return false;
+        }
+        return true;
+    }
+
+    public boolean getNeedMerge(int currentVal, int nextVal, int storedNextRow, boolean[] hasMerged) {
+        if (hasMerged[storedNextRow] == false)
+            if (currentVal == nextVal){
+                return true;
+            }
+        return false;
+    }
+
+
 
     /** Checks if the game is over and sets the gameOver variable
      *  appropriately.
@@ -137,7 +221,13 @@ public class Model extends Observable {
      *  Empty spaces are stored as null.
      * */
     public static boolean emptySpaceExists(Board b) {
-        // TODO: Fill in this function.
+        for (int i = 0; i < b.size(); i += 1) {
+            for (int j = 0; j < b.size(); j += 1) {
+                if (b.tile(i, j) == null) {
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -147,7 +237,16 @@ public class Model extends Observable {
      * given a Tile object t, we get its value with t.value().
      */
     public static boolean maxTileExists(Board b) {
-        // TODO: Fill in this function.
+        for (int i = 0; i < b.size(); i += 1) {
+            for (int j = 0; j < b.size(); j += 1) {
+                if (b.tile(i, j) != null) {
+                    int t = b.tile(i, j).value();
+                    if (t == MAX_PIECE) {
+                        return true;
+                    }
+                }
+            }
+        }
         return false;
     }
 
@@ -158,9 +257,33 @@ public class Model extends Observable {
      * 2. There are two adjacent tiles with the same value.
      */
     public static boolean atLeastOneMoveExists(Board b) {
-        // TODO: Fill in this function.
+        if (Model.emptySpaceExists(b)) {
+            return true;
+        }
+        if (Model.nextChecker(b)) {
+            return true;
+        }
+        b.setViewingPerspective(Side.EAST);
+        if (Model.nextChecker(b)) {
+            return true;
+        }
         return false;
     }
+
+    public static boolean nextChecker(Board b) {
+        for (int i = 0; i < b.size(); i += 1) {
+            for (int j = 0; j < (b.size() - 1); j += 1) {
+                int current = b.tile(i, j).value();
+                int next = b.tile(i, j + 1).value();
+                if (current == next) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+
 
 
     @Override
